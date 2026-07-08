@@ -1,0 +1,8 @@
+{
+  "name": "debian-packaging-skills",
+  "description": "Debian/Ubuntu packaging skills: moving upstream releases through the official Debian path into Ubuntu (WasmEdge today; extensible to other packages).",
+  "version": "1.0.0",
+  "license": "MIT",
+  "author": { "name": "vincent", "email": "vincent@secondstate.io" },
+  "repository": "https://github.com/second-state/debian-packaging-skills"
+}

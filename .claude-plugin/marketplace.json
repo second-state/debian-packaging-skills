@@ -1,0 +1,11 @@
+{
+  "name": "debian-packaging-marketplace",
+  "owner": { "name": "Vincent", "email": "linzigang@gmail.com" },
+  "plugins": [
+    {
+      "name": "debian-packaging-skills",
+      "source": "./",
+      "description": "Debian/Ubuntu packaging skills (WasmEdge, and future packages)."
+    }
+  ]
+}

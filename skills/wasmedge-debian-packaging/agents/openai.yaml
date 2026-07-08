@@ -1,0 +1,4 @@
+interface:
+  display_name: "WasmEdge Debian Packaging"
+  short_description: "Move WasmEdge releases through Debian to Ubuntu"
+  default_prompt: "Use $wasmedge-debian-packaging to plan the official Debian-to-Ubuntu package update path for the current WasmEdge release."

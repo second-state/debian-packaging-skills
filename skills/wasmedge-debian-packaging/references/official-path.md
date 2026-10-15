@@ -1,5 +1,7 @@
 # Official Debian to Ubuntu Path for WasmEdge
 
+All external-action recipes below are conditional on the explicit user approval rule in [../SKILL.md](../SKILL.md#publication-permission). Preparing a package, having credentials, or receiving maintainer encouragement does not authorize publication or external artifact submission.
+
 ## Source of Truth Checks
 
 Always browse or query current sources before giving package-status advice:
@@ -44,11 +46,30 @@ Exit criteria:
 - the next external actor is identified
 - the current blocker is stated plainly
 
-Do not mark the release complete unless Debian or Ubuntu archive status
-confirms acceptance of the target version — and for the Debian stage, not
-before the package has migrated to testing with reverse-dep autopkgtests
-passing (Gate 3.5); for the Ubuntu stage, not before the version is
-published in the target series (Launchpad publishing history).
+Report unstable acceptance, testing migration/reverse-dependency health, and Ubuntu publication as separate milestones. Gate 3.5 is monitored alongside Ubuntu work, not a universal prerequisite for sync from unstable. Confirm each claimed milestone using archive status and publishing history.
+
+## Release Target Selection
+
+A Debian packaging branch normally advances one upstream version at a time. When several upstream releases are available, such as a maintenance release and a newer feature release, prepare both only as local comparisons unless the maintainer explicitly asks for parallel proposals.
+
+Use this decision:
+
+- Recommend the newer release when it supersedes the older one and its transition, ABI, toolchain, test, and migration risks are understood.
+- Recommend the maintenance release first when the newer release has a materially larger transition or compatibility risk, contains changes Debian cannot yet validate, or the maintainer wants a conservative update.
+- Normally propose one target for the same suite. This is not a Debian Policy ban on parallel MRs: maintainer-requested alternatives or draft design reviews, and separate destinations such as unstable/experimental or stable maintenance, can justify multiple proposals. Obtain user approval for each external action and label the purpose clearly.
+- If the first version is accepted and a later upstream version is still desired, prepare a second MR from the updated `debian/latest`. That is sequential release work, not parallel alternatives.
+
+The handoff should state:
+
+```text
+Candidate A: <version> — maintenance or feature release, key risks
+Candidate B: <version> — maintenance or feature release, key risks
+Recommendation: <one version>
+Reason: <why this version should be the next Debian upload>
+Not submitted: <the alternative remains local only>
+```
+
+If the maintainer chooses the other candidate, preserve reusable packaging fixes and prepare from the current canonical base. Do not delete work or rewrite shared history without appropriate authorization. Discover the team's branch conventions; `debian/latest` is the WasmEdge example, not a universal branch name.
 
 ## Release Gates
 
@@ -60,15 +81,7 @@ Gate 1: upstream release exists.
 
 Gate 2: Debian packaging is ready.
 
-- Confirm `+dfsg` repack status. The Debian version suffix MUST match the
-  orig tarball uscan actually produced. uscan applies the watch-file
-  `Repacksuffix` only when `Files-Excluded` removed at least one file. If
-  uscan warns `No files matched excluded pattern` and produces
-  `wasmedge_<version>.orig.tar.xz` (no `+dfsg`), upstream removed the
-  non-free file: use plain `<version>-1`, drop `Repacksuffix` from
-  `debian/watch`, drop `Files-Excluded` from `debian/copyright`, and note
-  the dropped repack in `debian/changelog`. Never rename the tarball or
-  force `+dfsg` back into the version to match old convention.
+- Audit repacking before choosing the Debian version. `No files matched excluded pattern` is a diagnostic, not proof of DFSG compliance: excluded content may have moved. Inspect the complete downloaded tree, additions, renamed files, licenses, and availability of source. If exclusions remain necessary, correct their patterns and rerun uscan. Drop `Files-Excluded` and `Repacksuffix` only when evidence shows repacking is no longer needed. Match the version to the verified resulting orig tarball; do not rename a tarball merely to preserve a suffix convention.
 - Confirm patches are refreshed or intentionally removed.
 - Confirm build dependencies are current.
 - Confirm shared-library package names, symbols/shlibs handling, and reverse dependency impact when ABI changes.
@@ -80,15 +93,8 @@ ABI verification (do not trust release-notes wording):
   changed. Verify in the upstream source: `CMakeLists.txt` sets
   `WASMEDGE_CAPI_VERSION` (file version, e.g. `libwasmedge.so.0.1.1`) and
   `WASMEDGE_CAPI_SOVERSION` (the SONAME, e.g. `libwasmedge.so.0`).
-- Decision rule: rename the library binary package (e.g. `libwasmedge0` →
-  `libwasmedge1`) if and only if `WASMEDGE_CAPI_SOVERSION` changed.
-- If the API/ABI changed but SOVERSION did not, expect
-  `dpkg-gensymbols` to fail the build with a symbols diff. Update
-  `debian/libwasmedge0.symbols` from that diff (new symbols use the upstream
-  version as minver, without the Debian revision), check reverse
-  dependencies (`apt-cache rdepends libwasmedge0` — e.g. crun), flag
-  removed/changed-signature symbols to the maintainer, and consider an
-  upstream bug asking for a SONAME bump.
+- Inspect the built ELF SONAME (for example with `readelf -d`), not only CMake variables. A SONAME change normally requires a coordinated library package transition; confirm package naming and reverse dependencies with the maintainer.
+- Explicitly compare symbols and public headers. `dpkg-gensymbols` failures depend on check level and cannot detect all ABI changes, including same-name C signature changes. Review minimum dependency versions against when symbols actually became available in Debian, including Debian patches and symbol-version changes; do not blindly copy generated output. Discover current reverse dependencies; crun is a WasmEdge example.
 - Per-architecture caution: C++ symbol mangling differs between
   architectures (e.g. `unsigned long` on LP64 vs ILP32). A symbols file
   regenerated from a single non-amd64 build (the containerized workflow
@@ -96,7 +102,7 @@ ABI verification (do not trust release-notes wording):
   C symbols this rarely matters; for `(c++)` entries, reason explicitly
   about the types involved, use `(arch=...)`/`(optional)` tags where they
   genuinely differ, and say in the handoff which architecture generated
-  the diff. The amd64 buildd log is the final arbiter.
+  the diff. Validate each relevant architecture; amd64 success does not establish correctness elsewhere. Do not mark required symbols optional merely to silence a failure.
 - If a release removes exported symbols, or changes the signature of a
   symbol while keeping its name, under an unchanged SONAME, treat it as a
   real ABI break — not a routine symbols-file update. (dpkg-gensymbols
@@ -158,33 +164,24 @@ Actions:
   an upstream URL/tag-scheme change: debug with
   `uscan --verbose --no-download`, fix `debian/watch` (the fix belongs in
   the MR), and re-run.
-- If `gbp import-orig` fails: an existing `upstream/<version>` tag or a
-  diverged pristine-tar branch from an earlier attempt are the common
-  causes. Recovery: delete the local prep branch, the `upstream/<version>`
-  tag, and re-run the import; `--no-pristine-tar` is a last resort (note
-  it in the handoff, since the maintainer expects pristine-tar data).
-- Supply-chain sanity before importing: confirm the downloaded tarball
-  really is the upstream release. GitHub's auto-generated tag tarballs
-  carry no upstream signature or published checksum, so verify by
-  content: unpack and compare against the upstream git tag
-  (`git -C <upstream-clone> diff <tag> --stat` against the unpacked tree,
-  or at minimum compare the commit hash embedded in the tarball's
-  top-level directory name with the tag's commit). If upstream starts
-  signing release artifacts, add `pgpsigurlmangle`/`signing-key.asc` to
-  the packaging instead and note it in the MR.
+- If `gbp import-orig` fails, inspect branch ancestry, the existing upstream tag, pristine-tar and dirty files. Preserve work and capture the failure. Prefer a new isolated preparation directory; do not delete branches/tags, reset shared history, or disable pristine-tar merely to bypass the error. Obtain scoped approval before destructive recovery.
+- Verify source provenance and content separately. Validate upstream signatures or authenticated checksums when available and record the trust source and archive digest. Safely extract the downloaded archive into a separate temporary directory and actually compare its content with an export of the verified upstream tag (for example, directory-to-directory `diff -ruN`). Account for export exclusions, submodules, generated release files and documented Debian repacking; investigate unexplained differences. `git diff <tag>` in an unrelated checkout and a commit identifier in a directory name do not verify archive content or authenticity. Record limitations if authenticated provenance is unavailable.
 - If the build FTBFS in sid: read the FIRST error in the build log, then
   classify — (a) new toolchain default (sid moved to a newer GCC/LLVM:
   check upstream for an existing fix to cherry-pick as a
   `debian/patches` entry), (b) missing/too-old build dependency (adjust
   `debian/control` and say why in the changelog), (c) test failure
   (investigate; `DEB_BUILD_OPTIONS=nocheck` is for local iteration only,
-  never the uploaded build). A patch that no longer applies: refresh with
-  `quilt push -f` + `quilt refresh` (or `gbp pq`), or drop it with a
-  changelog note saying it was fixed upstream.
+  not proof of upload readiness). For a patch that no longer applies, inspect and resolve every rejected hunk before refreshing with quilt or gbp pq. Verify the intended fix survives; never use force/refresh to silently discard changes. Drop an upstreamed patch only with evidence and a changelog note.
 - Import the new upstream tarball with the existing `+dfsg` repack rules after confirming the generated tarball name.
 - Refresh or drop `debian/patches` as needed.
 - Update `debian/changelog`.
 - Review `debian/control`, build dependencies, LLVM compatibility, symbols/shlibs, package names, reverse dependencies, and tests.
+- Review all relevant Debian bugs and FTBFS reports; determine which are fixed by the upstream release and list only verified bug numbers in `debian/changelog` `Closes:` entries.
+- Compare upstream trees with rename detection and audit packaging references:
+  `git diff --find-renames --summary <old-upstream>..<new-upstream>`. Check moved or deleted paths against `debian/copyright`, install files, patches, tests, and build rules. A removed `Files-Excluded` entry does not complete the copyright review if other tracked paths moved.
+- If the package has serialized or generated artifacts (for WasmEdge, this includes AOT output), check artifact format/version compatibility and state whether old artifacts need regeneration.
+- If the upstream project has optional plugins, bindings, or backends, compare upstream changes with Debian's enabled build options and shipped files; record why each relevant change does or does not affect the package.
 - Build with `sbuild -d unstable`.
 - Run package checks such as `lintian` if available. Triage by severity:
   `E:` must be fixed or overridden with a justification
@@ -224,7 +221,7 @@ Actions:
   The BTS path needs no account and is the official fallback when a Salsa
   account is blocked or pending approval — see "Debian BTS Submission"
   below.
-- Ask for sponsor upload if no WasmEdge contributor has Debian upload rights.
+- Coordinate upload with the existing Debian maintainer/team first. Seek sponsorship when appropriate to that arrangement; a sponsor's upload rights do not authorize bypassing the maintainer's release plan.
 
 Automation option:
 
@@ -451,13 +448,7 @@ gbp branches so the fork is buildable.
      That is a temporary IP ban (minutes), not an auth error -- stop
      retrying and wait; confirm Salsa itself is up over HTTPS meanwhile.
 
-3. Clean the branch history before pushing if you prepped on a stale
-   branch. gbp history should go base -> new upstream in a single import,
-   not detour through an intermediate version that was never uploaded:
-   reset `upstream/latest` and `pristine-tar` to the last released base,
-   re-run `gbp import-orig` for the new version, then land the packaging
-   (changelog + symbols + watch/copyright/rules) as one commit. Verify the
-   MR range shows only the import merge plus that one packaging commit.
+3. Check the final publication gate below. Prepare a focused range against the current canonical base, excluding unselected candidate imports. Preserve separate logical packaging commits unless the maintainer requests squashing. Follow the repository's gbp/pristine-tar conventions rather than requiring one packaging commit. Preserve existing work; prefer a fresh preparation branch over destructive resets.
 
 4. Push the gbp branches + upstream tag to the fork:
 
@@ -510,9 +501,20 @@ Before planning a Debian upload, check whether Debian is in a freeze period and 
 
 If freeze timing blocks normal sync, report the freeze as the blocker and propose the next realistic route.
 
+## Final Publication Gate
+
+Immediately before any authorized publication, recheck canonical HEAD, archive versions, existing MRs/bugs and maintainer decisions. Record the base commit and candidate commit. If equivalent or newer work supersedes the proposal, stop and reconcile rather than publishing a duplicate. Rebase or regenerate safely when needed and validate the final tree; old candidate build logs do not validate a changed candidate. Missing online access means freshness is unverified, not passed.
+
 ## Required Validation Artifacts
 
-For Debian MR or sponsor request, attach or summarize:
+Maintain an internal impact record (matrix or equivalent review notes) with result, evidence, required action and unresolved blocker for: source provenance/repack/licensing; renamed and added files; Debian bugs/FTBFS; policy/watch changes; ABI and reverse dependencies; generated formats; optional components; build/runtime/autopkgtests. Use justified `not applicable` or explicit `not tested`, never inferred passes.
+
+Review applicable Debian Policy changes before bumping Standards-Version. Review watch matching, version mangling, stable/prerelease selection, signatures and repacking; preserve maintainer policy unless a change is justified. These are not automatic version/style upgrades.
+
+Validate clean source regeneration, build isolation and offline build behavior where applicable, install/upgrade behavior, actual runtime execution, package autopkgtests and relevant reverse dependencies. Record candidate hash, architecture, dependency versions and skipped tests. `--version` alone is insufficient functional coverage.
+
+
+For Debian MR or sponsor request, summarize relevant results below in a few factual lines. Do not attach the entire internal impact record or logs by default. Include targeted evidence if required by the template, needed for a failure, or requested by the maintainer; external attachments still require approval.
 
 - source package build result
 - binary package build result
@@ -534,7 +536,11 @@ For Ubuntu sync, merge, or backport, attach or summarize:
 
 ## Maintainer Handoff Checklist
 
-For a Debian MR or bug, include:
+Before preparing a submission, follow [maintainer-readiness.md](maintainer-readiness.md). Reconcile the final Debian diff, changelog and candidate-specific evidence; the local finalizer is an optional internal aid, not a contributor form. A successful preparation is not a completed metadata audit, and finalization is not permission to publish.
+
+Complete the internal impact and freshness review before a Debian MR or bug. Present only relevant changes, verified tests, material limitations and decisions needed from the maintainer; do not paste the whole matrix. Do not infer a rejection reason from an MR's closed status; compare final trees and review evidence.
+
+Also include:
 
 - upstream version and release URL
 - summary of important upstream changes
@@ -559,27 +565,25 @@ For Ubuntu sync request, include:
 
 ### Debian Salsa MR Description
 
-```text
-Update wasmedge to <debian-version>.   # e.g. 0.17.0-1, or <version>+dfsg-1 when repacked
+Follow the repository's current template first. This is a fallback outline, not text to paste unchanged. Omit inapplicable sections and placeholders; include required assistance disclosure separately where project rules require it. No claims below are pre-approved facts.
 
+```text
+Update wasmedge to <debian-version>.
+
+<One sentence explaining the Debian-relevant benefit.>
 Upstream release: <release-url>
 
-Packaging notes:
-- <dfsg/repack note>
-- <patch changes>
-- <dependency changes>
+Packaging changes:
+- <Logical change and reason; omit unchanged metadata.>
 
-Validation:
-- <build command/result>
-- <test command/result>
-- <lintian result if available>
+Tests:
+- <Actual command, architecture/environment, and result.>
+- <Relevant limitation or warning, if any.>
 
-ABI/API impact:
-- <SOVERSION/shared library package/symbols/shlibs/plugin API impact>
-
-Intent:
-After Debian unstable accepts this version, we plan to request/suggest Ubuntu sync for the Ubuntu development release if no Ubuntu delta blocks it.
+<Material ABI/upgrade concern or a specific maintainer decision, if needed.>
 ```
+
+Do not add a generic Ubuntu intent paragraph unless it is relevant to the request. Put background links after the actionable information. For a bug report, retain the minimal reproducer and expected/actual result; brevity does not justify dropping required OS/version/architecture fields.
 
 ### Pre-Implementation Refinement Prompt
 

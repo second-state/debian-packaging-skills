@@ -1,0 +1,13 @@
+Source: fixture-greeter
+Section: utils
+Priority: optional
+Maintainer: Historical Maintainer <historical@example.invalid>
+Build-Depends: debhelper-compat (= 13), python3
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+
+Package: fixture-greeter
+Architecture: all
+Depends: ${misc:Depends}, python3
+Description: tiny offline workflow acceptance fixture
+ This is not an archive upload candidate.

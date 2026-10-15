@@ -2,8 +2,7 @@
 
 How a wasmedge version that reached Debian actually lands in Ubuntu — the
 development series first, then released series via backports or SRU.
-Prerequisite: the Debian-side exit criterion in
-[debian-post-upload.md](debian-post-upload.md) holds.
+For sync from unstable, verify Debian unstable acceptance and assess known regressions. Debian testing migration is a separate health milestone, not a universal prerequisite. All external actions below, including PPA builds, messages and uploads, require explicit user approval under [../SKILL.md](../SKILL.md#publication-permission).
 
 ## Auto-sync
 
@@ -27,8 +26,7 @@ Triage before falling back to a manual request:
    the publishing history and
    `https://ubuntu-archive-team.ubuntu.com/proposed-migration/` (Ubuntu
    runs its own britney; see "proposed migration" below).
-3. Ubuntu delta appeared since you last checked (`ubuntu1` suffix or
-   `build1` rebuild)? Then it is a merge, not a sync.
+3. Inspect actual Ubuntu source changes. A `build1` no-change rebuild does not establish substantive delta; a version suffix alone cannot decide sync versus merge. Preserve needed Ubuntu changes through a merge, or justify dropping obsolete delta when syncing.
 4. Only then: request a manual sync.
 
 ## Manual sync
@@ -46,8 +44,7 @@ state why in the bug), freeze status. Docs:
 
 ## Merge (Ubuntu carries delta)
 
-When Ubuntu has local changes (`...ubuntu1`), the new Debian version must
-be **merged**, not synced. The current official procedure uses
+When Ubuntu has substantive local changes that still need preserving, the new Debian version must be **merged**, not synced. The current official procedure uses
 **git-ubuntu**; Merge-o-Matic remains useful for FINDING outstanding
 merges, not for performing them:
 
@@ -136,7 +133,7 @@ maintains them.
    rights).
    Reference: `https://documentation.ubuntu.com/project/how-ubuntu-is-made/processes/backports/`
 
-### SRU (targeted bug/security fixes only — never feature releases)
+### SRU and security updates (distinct approval paths)
 
 For a specific serious bug in a released series (e.g. a crash or CVE in
 the wasmedge version shipped in an LTS):
@@ -151,8 +148,7 @@ the wasmedge version shipped in an LTS):
    [ Other Info ]    anything a reviewer will ask about
    ```
 
-2. Prepare a minimal debdiff against the released version (cherry-picked
-   fix, NOT a new upstream release), version it
+2. Default to a minimal, regression-tested fix against the released version. Approved microrelease or package-specific SRU exceptions may allow a new upstream release; verify current policy and obtain the required approval rather than assuming an exception. Version it
    `<old-version>ubuntu0.1` (or `+deb..build0.1` style per existing
    version), upload via sponsor to the series' `-proposed`.
 3. The SRU team (`~ubuntu-sru`) reviews; once accepted into `-proposed`,
@@ -160,19 +156,8 @@ the wasmedge version shipped in an LTS):
    (from `verification-needed-<series>`); after ~7 days aging without
    regressions it is released to `-updates`.
    Reference: `https://documentation.ubuntu.com/project/SRU/`
-4. Real security vulnerabilities: also check Debian's tracker
-   (`https://security-tracker.debian.org/tracker/source-package/wasmedge`)
-   and Ubuntu's CVE pages (`https://ubuntu.com/security/cves?package=wasmedge`).
-   For universe packages the Ubuntu Security Team usually does not issue
-   USNs — the fix path is an SRU prepared by the community (us), so a CVE
-   in a shipped wasmedge is OUR action item, not something to wait on.
-   For a NOT-yet-public (embargoed) vulnerability, do NOT open public
-   BTS/Launchpad bugs or push fixes to public branches: contact
-   `team@security.debian.org` (Debian) and `security@ubuntu.com`
-   (Ubuntu) privately, coordinate the disclosure date with upstream's
-   advisory (GitHub Security Advisory in WasmEdge/WasmEdge), and only
-   then run the public SRU/upload machinery. Cherry-pick the minimal fix
-   commit; never ship a new upstream version as a security update.
+4. Security vulnerabilities require security coordination, not automatic routing through ordinary SRU because a package is in universe. Check Debian's security tracker and Ubuntu CVE pages, affected versions and current support arrangements. Coordinate the fix, target pocket and disclosure with the appropriate security team under current policy. Minimal backports are the default, not an absolute ban on approved upstream-version updates.
+   For embargoed vulnerabilities, do not publish bugs, branches or artifacts. Prepare a private coordination draft for `team@security.debian.org` and/or `security@ubuntu.com` as appropriate; sending even private mail requires user approval. Preserve the embargo and obtain coordinated clearance before any publication.
 
 ## Standing monitoring (close the loop)
 

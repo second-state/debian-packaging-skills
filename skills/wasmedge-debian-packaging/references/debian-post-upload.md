@@ -1,9 +1,8 @@
 # Debian: After the Upload
 
-What happens between "sponsor uploaded the package" and "Ubuntu can sync
-it", and what to do at each stage when it stalls. Acceptance into unstable
-is NOT the finish line: the package must also migrate to testing, and
-reverse dependencies must keep working.
+Track unstable acceptance, testing migration and reverse-dependency health separately. Ubuntu may sync from unstable before Debian testing migration; evaluate known regressions rather than imposing an unconditional migration prerequisite.
+
+Every email, bug, comment, upload and external submission below requires explicit user approval under [../SKILL.md](../SKILL.md#publication-permission).
 
 ## Stage map
 
@@ -50,11 +49,7 @@ that cannot migrate usually indicates a problem Ubuntu will inherit.
     indefinitely. This is the direct consequence of the ABI changes the
     Gate 2 analysis flags — check crun's autopkgtest result in the
     excuses page in the first days after acceptance.
-- If stuck on a reverse-dep regression: reproduce locally
-  (`autopkgtest crun -- schroot sid`, which needs a pre-built sid schroot
-  from `mk-sbuild`/`sbuild-createchroot`; otherwise read the CI log
-  linked from the excuses page), then either fix wasmedge (restore
-  compatibility), or
+- If stuck on a reverse-dep regression: inspect the migration CI log and reproduce with the actual candidate library, architecture, test version and dependency environment. A generic sid autopkgtest run may test different packages and is not equivalent evidence. Then either fix wasmedge (restore compatibility), or
   coordinate a fixed crun upload with its maintainer, or — if the
   regression is in the test not the code — file a bug against crun asking
   for a test update and reference it in the excuses (the release team can
@@ -88,46 +83,21 @@ the Debian release team (wanna-build access).
 - Not a binNMU: failed builds are "give-back" (`gb`) requests to
   `debian-wb-team@lists.debian.org`, not binNMUs.
 
-## Maintainer unresponsive: escalation ladder
+## Maintainer communication and exceptional escalation
 
-The handoff's expected blocker is maintainer/sponsor action. If nothing
-happens, escalate in this order — each step is legitimate and documented;
-skipping steps is considered hostile (package hijacking).
+Silence is not permission to replace the maintainer's release plan. Check recent team activity, existing proposals and stated blockers first. With user approval, send a concise follow-up offering help through the established channel; avoid duplicate requests.
 
-1. **~2 weeks**: ping the BTS bug (mail `<bugno>@bugs.debian.org`) asking
-   if help is wanted; offer the prepared branch/patches again.
-2. **~4 weeks**: seek a sponsor independently of the maintainer — file an
-   RFS bug against the `sponsorship-requests` pseudo-package
-   (`Subject: RFS: wasmedge/<debian-version> -- <one-line summary>`,
-   guidance at `https://mentors.debian.net/sponsors/`), and/or upload the
-   package to `mentors.debian.net` and ask on the `debian-mentors` list.
-3. **NMU** (needs a DD to perform it): a non-maintainer upload through the
-   DELAYED queue. Conventions (devref 5.11): announce intent in the BTS,
-   attach the patch (`nmudiff`), use DELAYED/15 for non-RC changes (2–5
-   days for RC bugs), version the upload `<upstream>-<rev>.1` (e.g.
-   `0.17.0-0.1` for a new-upstream NMU). Check the maintainer's stance on
-   `https://wiki.debian.org/LowThresholdNmu` first.
-4. **Package salvaging** (takes over maintainership of this one package):
-   allowed when e.g. no visible maintainer activity for 6 months, or an
-   unacknowledged NMU has sat for a month — full criteria at
-   `https://wiki.debian.org/PackageSalvaging`. Procedure (devref ch. 5):
-   file an ITS (Intent to Salvage) bug with all maintainers/uploaders in
-   `X-Debbugs-Cc` (add `mia@qa.debian.org` too if the maintainer looks
-   inactive), wait the **21-day objection window**, then upload with
-   yourself as maintainer via **DELAYED/7 or longer** — not directly.
-5. **MIA team** (questions the maintainer's overall activity): write to
-   `mia@qa.debian.org` with the evidence trail. Slowest, affects more
-   than one package; last resort.
+Coordinate sponsorship with the maintainer/team. A sponsor supplies review and upload authority, not automatic permission to bypass maintenance decisions. See https://mentors.debian.net/sponsors/.
 
-Record every step in the BTS bug — the paper trail is what authorizes the
-later steps.
+NMUs, salvaging and MIA procedures are distinct exceptional processes, not timer-triggered steps for a new upstream release. Before proposing one, verify current Developer's Reference guidance, package/team policy, urgency, scope, notifications and waiting requirements with an appropriate Debian developer. Broad new-upstream NMUs need particular justification. A paper trail provides evidence, not authorization. Do not execute any escalation without explicit user approval.
+
+References: https://www.debian.org/doc/manuals/developers-reference/pkgs.en.html and https://wiki.debian.org/PackageSalvaging.
 
 ## Exit criterion for this stage
 
-Declare the Debian side done only when BOTH hold:
-- the target version is in **testing** (or the excuses page shows it
-  merely aging, with no blocking regressions), and
-- reverse dependencies (crun) are installable and passing autopkgtest
-  against the new version.
+Report milestones independently:
+- Unstable acceptance: archive confirms the exact version.
+- Testing migration: the target actually migrated; merely aging means pending.
+- Reverse-dependency health: record actual installability and test results, including gaps.
 
-Then move to the Ubuntu side: see [ubuntu-path.md](ubuntu-path.md).
+Ubuntu work may proceed from unstable acceptance after reviewing risks and the target series' policy; it need not wait for testing migration. Continue monitoring Debian health alongside [ubuntu-path.md](ubuntu-path.md).

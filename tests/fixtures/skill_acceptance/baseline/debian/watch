@@ -1,0 +1,2 @@
+version=4
+https://example.invalid/fixture-greeter/ .*/fixture-greeter-([0-9.]+)\.tar\.gz

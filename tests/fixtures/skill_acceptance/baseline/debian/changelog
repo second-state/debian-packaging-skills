@@ -1,0 +1,6 @@
+fixture-greeter (1.0-1) unstable; urgency=medium
+
+  * Initial release.
+  * Keep the stable-only watch policy.
+
+ -- Historical Maintainer <historical@example.invalid>  Mon, 01 Jan 2024 00:00:00 +0000
